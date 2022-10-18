@@ -44,6 +44,7 @@ pub(crate) mod fixed_string;
 mod ip;
 pub(crate) mod iter;
 mod list;
+mod lowcardinality;
 mod map;
 mod nullable;
 mod numeric;

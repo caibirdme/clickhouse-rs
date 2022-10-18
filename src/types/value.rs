@@ -53,6 +53,7 @@ pub enum Value {
         &'static SqlType,
         Arc<HashMap<Value, Value>>,
     ),
+    LowCardinality(&'static SqlType, Box<Value>),
 }
 
 impl Hash for Value {
@@ -176,6 +177,7 @@ impl Value {
             SqlType::Enum8(values) => Value::Enum8(values, Enum8(0)),
             SqlType::Enum16(values) => Value::Enum16(values, Enum16(0)),
             SqlType::Map(k, v) => Value::Map(k, v, Arc::new(HashMap::default())),
+            SqlType::LowCardinality(t) => Value::LowCardinality(t, Box::new(Value::default(t.to_owned()))),
         }
     }
 }
@@ -255,7 +257,8 @@ impl fmt::Display for Value {
                     .map(|(k, v)| format!("key=>{} value=>{}", k, v))
                     .collect();
                 write!(f, "[{}]", cells.join(", "))
-            }
+            },
+            Value::LowCardinality(_, data) => data.fmt(f)
         }
     }
 }
@@ -296,6 +299,7 @@ impl From<Value> for SqlType {
                 SqlType::DateTime(DateTimeType::DateTime64(precision, tz))
             }
             Value::Map(k, v, _) => SqlType::Map(k, v),
+            Value::LowCardinality(t, _) => SqlType::LowCardinality(t),
         }
     }
 }

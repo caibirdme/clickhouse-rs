@@ -47,6 +47,7 @@ pub enum ValueRef<'a> {
         &'static SqlType,
         Arc<HashMap<ValueRef<'a>, ValueRef<'a>>>,
     ),
+    LowCardinality(&'static SqlType, Box<ValueRef<'a>>),
 }
 
 impl<'a> Hash for ValueRef<'a> {
@@ -186,7 +187,8 @@ impl<'a> fmt::Display for ValueRef<'a> {
             ValueRef::Map(_, _, vs) => {
                 let cells: Vec<String> = vs.iter().map(|v| format!("{}-{}", v.0, v.1)).collect();
                 write!(f, "[{}]", cells.join(", "))
-            }
+            },
+            ValueRef::LowCardinality(_, v) => write!(f, "{}", v),
         }
     }
 }
@@ -223,6 +225,7 @@ impl<'a> convert::From<ValueRef<'a>> for SqlType {
                 SqlType::DateTime(DateTimeType::DateTime64(*precision, *tz))
             }
             ValueRef::Map(k, v, _) => SqlType::Map(k, v),
+            ValueRef::LowCardinality(t, _) => SqlType::LowCardinality(t),
         }
     }
 }
@@ -302,6 +305,10 @@ impl<'a> From<ValueRef<'a>> for Value {
                     value_list.insert(key, value);
                 }
                 Value::Map(k, v, Arc::new(value_list))
+            }
+            ValueRef::LowCardinality(t, v) => {
+                let value: Value = (*v).into();
+                Value::LowCardinality(t, Box::new(value))
             }
         }
     }
@@ -393,6 +400,10 @@ impl<'a> From<&'a Value> for ValueRef<'a> {
                     ref_map.insert(key_ref, value_ref);
                 }
                 ValueRef::Map(*k, *v, Arc::new(ref_map))
+            },
+            Value::LowCardinality(t, v) => {
+                let value_ref = v.as_ref().into();
+                ValueRef::LowCardinality(*t, Box::new(value_ref))
             }
         }
     }

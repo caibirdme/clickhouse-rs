@@ -312,6 +312,7 @@ pub enum SqlType {
     Enum16(Vec<(String, i16)>),
     SimpleAggregateFunction(SimpleAggFunc, &'static SqlType),
     Map(&'static SqlType, &'static SqlType),
+    LowCardinality(&'static SqlType),
 }
 
 lazy_static! {
@@ -397,6 +398,7 @@ impl SqlType {
                 format!("Enum16({})", a.join(",")).into()
             }
             SqlType::Map(k, v) => format!("Map({}, {})", &k, &v).into(),
+            SqlType::LowCardinality(v) => format!("LowCardinality({})", &v).into(),
         }
     }
 

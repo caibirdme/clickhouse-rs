@@ -23,6 +23,7 @@ use crate::{
             fixed_string::FixedStringColumnData,
             ip::{IpColumnData, Ipv4, Ipv6, Uuid},
             list::List,
+            lowcardinality::LowCardinalityColumnData,
             map::MapColumnData,
             nullable::NullableColumnData,
             numeric::VectorColumnData,
@@ -99,6 +100,8 @@ impl dyn ColumnData {
                     W::wrap(DateTime64ColumnData::load(reader, size, precision, column_timezone)?)
                 } else if let Some((func, inner_type)) = parse_simple_agg_fun(type_name) {
                     W::wrap(SimpleAggregateFunctionColumnData::load(reader, func, inner_type, size, tz)?)
+                } else if let Some(inner_type) = parse_lowcardinality(type_name) {
+                    W::wrap(LowCardinalityColumnData::load(reader, inner_type, size, tz)?)
                 } else {
                     let message = format!("Unsupported column type \"{}\".", type_name);
                     return Err(message.into());
@@ -212,6 +215,7 @@ impl dyn ColumnData {
                 )?,
                 size: 0,
             }),
+            SqlType::LowCardinality(_v) => unimplemented!()
         })
     }
 }
@@ -362,6 +366,23 @@ fn parse_decimal(source: &str) -> Option<(u8, u8, NoBits)> {
         _ => None,
     }
 }
+
+
+fn parse_lowcardinality(source: &str) -> Option<&str> {
+    if !source.starts_with("LowCardinality") {
+        return None;
+    }
+    const unsupport_types: [&str;5] = ["Nullable", "LowCardinality", "Map", "Array", "Decimal"];
+
+    let inner_type = &source["LowCardinality".len()+1..source.len() - 1];
+    for &s in unsupport_types.iter() {
+        if inner_type.starts_with(s) {
+            return None;
+        }
+    }
+    Some(inner_type)
+}
+
 
 enum EnumSize {
     Enum8,
