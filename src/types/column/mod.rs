@@ -26,7 +26,7 @@ use crate::{
     },
 };
 
-use self::chunk::ChunkColumnData;
+use self::{chunk::ChunkColumnData, nullable::NullableColumnData, lowcardinality::LowCardinalityColumnData};
 pub(crate) use self::{column_data::ColumnData, string_pool::StringPool};
 pub use self::{concat::ConcatColumnData, numeric::VectorColumnData};
 
@@ -422,6 +422,37 @@ impl<K: ColumnType> Column<K> {
                     }),
                     _marker: marker::PhantomData,
                 })
+            },
+            (SqlType::Nullable(expect_t), _) => {
+                if let Some(data) = self.data.cast_to(&self.data, expect_t) {
+                    let name = self.name().to_owned();
+                    NullableColumnData
+                    Ok(Column {
+                        name,
+                        data,
+                        _marker: marker::PhantomData,
+                    })
+                } else {
+                    Err(Error::FromSql(FromSqlError::InvalidType {
+                        src: src_type.to_string(),
+                        dst: dst_type.to_string(),
+                    }))
+                }
+            },
+            (SqlType::LowCardinality(expect_t), _) => {
+                if let Some(data) = self.data.cast_to(&self.data, expect_t) {
+                    let name = self.name().to_owned();
+                    Ok(Column {
+                        name,
+                        data,
+                        _marker: marker::PhantomData,
+                    })
+                } else {
+                    Err(Error::FromSql(FromSqlError::InvalidType {
+                        src: src_type.to_string(),
+                        dst: dst_type.to_string(),
+                    }))
+                }
             }
             _ => {
                 if let Some(data) = self.data.cast_to(&self.data, &dst_type) {

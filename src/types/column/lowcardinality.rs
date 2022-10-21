@@ -1,3 +1,5 @@
+use std::collections::hash_map::{HashMap, Entry};
+
 use chrono_tz::Tz;
 use crate::{
     errors::{
@@ -6,9 +8,12 @@ use crate::{
         FromSqlError,
     },
     types::{
-        column::{ArcColumnData, VectorColumnData},
+        column::ArcColumnData,
         SqlType,
+        Value,
+        ValueRef,
     },
+    
     binary::{Encoder, ReadEx},
 };
 
@@ -23,7 +28,7 @@ impl LowCardinalityColumnData {
     pub(crate) fn load<R: ReadEx>(
         reader: &mut R,
         type_name: &str,
-        size: usize,
+        _size: usize,
         tz: Tz,
     ) -> Result<Self> {
         const TYPE_MASK: u64 = 0b11111111;
@@ -45,6 +50,33 @@ impl LowCardinalityColumnData {
     }
 }
 
+impl From<ArcColumnData> for LowCardinalityColumnData {
+    fn from(col_data: ArcColumnData) -> Self {
+        let mut m = HashMap::new();
+        let mut count = 0;
+        let mut index = Vec::with_capacity(col_data.len());
+        for i in 0..col_data.len() {
+            let v_ref = col_data.at(i);
+            match m.entry(&v_ref) {
+                Entry::Occupied(c) => {
+                    index[i] = *c.get();
+                },
+                Entry::Vacant(c) => {
+                    c.insert(count);
+                    index[i] = count;
+                    count+=1;
+                }
+            }
+        }
+        
+    }
+}
+
+fn into_index_column_data(arr: Vec<i32>) -> ArcColumnData {
+    let n = arr.len();
+    
+}
+
 impl ColumnData for LowCardinalityColumnData {
     fn len(&self) -> usize {
         self.key_data.len()
@@ -52,10 +84,10 @@ impl ColumnData for LowCardinalityColumnData {
     fn sql_type(&self) -> SqlType {
         SqlType::LowCardinality(self.index_data.sql_type().into())
     }
-    fn at(&self, index: usize) -> crate::types::ValueRef {
+    fn at(&self, index: usize) -> ValueRef {
         unimplemented!()
     }
-    fn push(&mut self, value: crate::types::Value) {
+    fn push(&mut self, value: Value) {
         unimplemented!()
     }
     fn save(&self, encoder: &mut Encoder, start: usize, end: usize) {
